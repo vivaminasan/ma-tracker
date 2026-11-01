@@ -1,0 +1,54 @@
+name: Update 200MA
+
+on:
+  schedule:
+    # UTC. 21:30 is after the US close in both EDT (20:00 UTC) and EST (21:00 UTC).
+    # The second run is a retry in case the data provider was late; dedupe prevents double alerts.
+    - cron: "30 21 * * 1-5"
+    - cron: "30 22 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      test_telegram:
+        description: "Send a test Telegram message"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-ma
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Fetch data, compute MA, send alerts
+        run: node scripts/update.mjs
+        env:
+          SYMBOLS: "QQQ,SPY"
+          TIINGO_TOKEN: ${{ secrets.TIINGO_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TEST_TELEGRAM: ${{ inputs.test_telegram }}
+
+      - name: Commit data
+        if: always()
+        run: |
+          git config user.name "ma-bot"
+          git config user.email "ma-bot@users.noreply.github.com"
+          git add docs/data
+          if git diff --cached --quiet; then
+            echo "Nothing to commit"
+          else
+            git commit -m "Update data"
+            git pull --rebase
+            git push
+          fi
