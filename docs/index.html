@@ -71,7 +71,7 @@ async function init() {
   show(syms[0]);
 
   document.getElementById("foot").textContent =
-    "Data: Tiingo (end of day). Last updated " + new Date(store.updated).toLocaleString();
+    "Last updated " + new Date(store.updated).toLocaleString();
 
   // Redraw the chart if the system switches between light and dark
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => show(current));
