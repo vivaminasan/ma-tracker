@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>200-Day MA Tracker</title>
+<style>
+  :root { --bg:#fff; --fg:#1a1a1a; --muted:#6b7280; --card:#f4f5f7; --up:#15803d; --down:#b91c1c; --line:#2563eb; --ma:#f59e0b; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0f1115; --fg:#e5e7eb; --muted:#9ca3af; --card:#1a1d24; --up:#4ade80; --down:#f87171; --line:#60a5fa; --ma:#fbbf24; }
+  }
+  body { font-family: system-ui, sans-serif; background:var(--bg); color:var(--fg); margin:0; padding:1rem; }
+  main { max-width: 900px; margin: 0 auto; }
+  .tabs button { background:var(--card); color:var(--fg); border:0; padding:.5rem 1rem; border-radius:8px; cursor:pointer; margin-right:.5rem; }
+  .tabs button.active { outline:2px solid var(--line); }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:.75rem; margin:1rem 0; }
+  .card { background:var(--card); padding:.75rem 1rem; border-radius:10px; }
+  .card small { color:var(--muted); display:block; }
+  .card b { font-size:1.3rem; }
+  .above { color:var(--up); } .below { color:var(--down); }
+  .chart { position:relative; height:380px; }
+  footer { color:var(--muted); font-size:.8rem; margin-top:1rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>200-Day Moving Average</h1>
+  <div class="tabs" id="tabs"></div>
+  <div class="cards" id="cards"></div>
+  <div class="chart"><canvas id="chart"></canvas></div>
+  <footer id="foot"></footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+let chart, store;
+
+async function init() {
+  try {
+    // Relative path so it works at https://USER.github.io/REPO/
+    const res = await fetch("data/latest.json?t=" + Date.now());
+    store = await res.json();
+  } catch (e) {
+    store = {};
+  }
+  const syms = Object.keys(store.symbols || {});
+  if (!syms.length) {
+    document.getElementById("cards").textContent =
+      "No data yet. Run the GitHub Action once (Actions tab → Update 200MA → Run workflow).";
+    return;
+  }
+  const tabs = document.getElementById("tabs");
+  syms.forEach((s, i) => {
+    const b = document.createElement("button");
+    b.textContent = s;
+    b.onclick = () => show(s);
+    tabs.appendChild(b);
+    if (i === 0) show(s);
+  });
+  document.getElementById("foot").textContent =
+    "Data: Tiingo (end of day). Last updated " + new Date(store.updated).toLocaleString();
+}
+
+function show(sym) {
+  const d = store.symbols[sym];
+  document.querySelectorAll(".tabs button").forEach((b) =>
+    b.classList.toggle("active", b.textContent === sym)
+  );
+
+  const cls = d.state;
+  const sign = d.pctFromMA > 0 ? "+" : "";
+  document.getElementById("cards").innerHTML = `
+    <div class="card"><small>Status</small><b class="${cls}">${d.state.toUpperCase()}</b></div>
+    <div class="card"><small>Close (${d.date})</small><b>${d.close.toFixed(2)}</b></div>
+    <div class="card"><small>200 MA</small><b>${d.ma.toFixed(2)}</b></div>
+    <div class="card"><small>Distance</small><b class="${cls}">${sign}${d.pctFromMA}%</b></div>
+    <div class="card"><small>Days in state</small><b>${d.daysInState}</b></div>`;
+
+  const css = getComputedStyle(document.documentElement);
+  const cfg = {
+    type: "line",
+    data: {
+      labels: d.series.map((p) => p.d),
+      datasets: [
+        { label: sym + " close", data: d.series.map((p) => p.c), borderColor: css.getPropertyValue("--line").trim(), pointRadius: 0, borderWidth: 1.5 },
+        { label: "200 MA", data: d.series.map((p) => p.ma), borderColor: css.getPropertyValue("--ma").trim(), pointRadius: 0, borderWidth: 2 },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      scales: { x: { ticks: { maxTicksLimit: 8 } } },
+    },
+  };
+  if (chart) chart.destroy();
+  chart = new Chart(document.getElementById("chart"), cfg);
+}
+
+init();
+</script>
+</body>
+</html>
