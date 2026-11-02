@@ -5,7 +5,7 @@ on:
     # UTC. 21:30 is after the US close in both EDT (20:00 UTC) and EST (21:00 UTC).
     # The second run is a retry in case the data provider was late; dedupe prevents double alerts.
     - cron: "30 21 * * 1-5"
-    - cron: "30 22 * * 1-5"
+    - cron: "03 22 * * 1-5"
   workflow_dispatch:
     inputs:
       test_telegram:
