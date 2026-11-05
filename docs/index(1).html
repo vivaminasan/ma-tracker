@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>200-Day MA Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.0.6/css/pico.min.css">
+<style>
+  :root[data-theme="dark"] {
+    --pico-font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --pico-font-size: 93.75%;
+    --pico-border-radius: 0;
+    --pico-background-color: #000;
+    --pico-color: #e8e8e8;
+    --pico-muted-color: #8a8a8a;
+    --pico-muted-border-color: #2a2a2a;
+    --pico-card-background-color: #0d0d0d;
+    --pico-card-sectioning-background-color: #0d0d0d;
+    --amber: #ff9f1a;
+    --up: #00d26a;
+    --down: #ff4d4d;
+    --line: #e8e8e8;
+    --ma: #ff9f1a;
+    --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+
+  main { padding-top: 1rem; }
+  h1 { color: var(--amber); font-size: 1.15rem; letter-spacing: .14em; text-transform: uppercase; margin-bottom: .25rem; }
+  .sub { color: var(--pico-muted-color); margin-bottom: 1rem; font-size: .85rem; }
+
+  /* Ticker strip (also the symbol selector) */
+  .strip { display: flex; gap: 0; overflow-x: auto; border: 1px solid var(--pico-muted-border-color); margin-bottom: 1rem; }
+  .strip button {
+    all: unset; cursor: pointer; flex: 0 0 auto; min-width: 9.5rem;
+    padding: .6rem 1rem; border-right: 1px solid var(--pico-muted-border-color);
+    border-bottom: 2px solid transparent; font-family: var(--mono); font-size: .85rem;
+  }
+  .strip button:hover { background: #111; }
+  .strip button.active { background: #111; border-bottom-color: var(--amber); }
+  .strip .sym { display: block; color: var(--amber); font-weight: 600; letter-spacing: .06em; }
+  .strip .px { font-variant-numeric: tabular-nums; }
+  .strip .pct { font-variant-numeric: tabular-nums; margin-left: .4rem; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--pico-muted-border-color); border: 1px solid var(--pico-muted-border-color); margin-bottom: 1rem; }
+  .stats div { background: var(--pico-card-background-color); padding: .8rem 1rem; }
+  .stats small { display: block; color: var(--pico-muted-color); text-transform: uppercase; letter-spacing: .08em; font-size: .68rem; }
+  .stats b { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 1.45rem; font-weight: 600; }
+
+  .above { color: var(--up); }
+  .below { color: var(--down); }
+
+  .panel { border: 1px solid var(--pico-muted-border-color); background: var(--pico-card-background-color); padding: 1rem; }
+  .chart { position: relative; height: 400px; }
+  footer small { color: var(--pico-muted-color); font-family: var(--mono); font-size: .75rem; }
+</style>
+</head>
+<body>
+<main class="container-fluid">
+  <h1>200-Day Moving Average</h1>
+  <div class="sub">End-of-day close vs. 200-day simple moving average</div>
+
+  <div class="strip" id="strip"></div>
+  <div class="stats" id="cards"></div>
+  <div class="panel"><div class="chart"><canvas id="chart"></canvas></div></div>
+
+  <footer><small id="foot"></small></footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+let chart, store, current;
+
+async function init() {
+  try {
+    // Relative path works on GitHub Pages and Cloudflare Pages
+    const res = await fetch("data/latest.json?t=" + Date.now());
+    store = await res.json();
+  } catch (e) {
+    store = {};
+  }
+
+  const syms = Object.keys(store.symbols || {});
+  if (!syms.length) {
+    document.getElementById("cards").textContent =
+      "No data yet. Run the GitHub Action once (Actions tab → Update 200MA → Run workflow).";
+    return;
+  }
+
+  const strip = document.getElementById("strip");
+  syms.forEach((s) => {
+    const d = store.symbols[s];
+    const sign = d.pctFromMA > 0 ? "+" : "";
+    const b = document.createElement("button");
+    b.dataset.sym = s;
+    b.innerHTML =
+      `<span class="sym">${s}</span>` +
+      `<span class="px">${d.close.toFixed(2)}</span>` +
+      `<span class="pct ${d.state}">${sign}${d.pctFromMA}%</span>`;
+    b.onclick = () => show(s);
+    strip.appendChild(b);
+  });
+  show(syms[0]);
+
+  document.getElementById("foot").textContent =
+    "Last updated " + new Date(store.updated).toLocaleString();
+}
+
+function show(sym) {
+  current = sym;
+  const d = store.symbols[sym];
+
+  document.querySelectorAll("#strip button").forEach((b) =>
+    b.classList.toggle("active", b.dataset.sym === sym)
+  );
+
+  const cls = d.state;
+  const sign = d.pctFromMA > 0 ? "+" : "";
+  document.getElementById("cards").innerHTML = `
+    <div><small>Status</small><b class="${cls}">${d.state.toUpperCase()}</b></div>
+    <div><small>Close (${d.date})</small><b>${d.close.toFixed(2)}</b></div>
+    <div><small>200 MA</small><b>${d.ma.toFixed(2)}</b></div>
+    <div><small>Distance</small><b class="${cls}">${sign}${d.pctFromMA}%</b></div>
+    <div><small>Days in state</small><b>${d.daysInState}</b></div>`;
+
+  const css = getComputedStyle(document.documentElement);
+  const get = (v) => css.getPropertyValue(v).trim();
+  const muted = get("--pico-muted-color");
+  const grid = "#1c1c1c";
+
+  Chart.defaults.font.family = "'IBM Plex Mono', ui-monospace, monospace";
+  Chart.defaults.color = muted;
+
+  const cfg = {
+    type: "line",
+    data: {
+      labels: d.series.map((p) => p.d),
+      datasets: [
+        { label: sym + " close", data: d.series.map((p) => p.c), borderColor: get("--line"), pointRadius: 0, borderWidth: 1.25, tension: 0 },
+        { label: "200 MA", data: d.series.map((p) => p.ma), borderColor: get("--ma"), pointRadius: 0, borderWidth: 1.75, tension: 0 },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { labels: { color: muted, boxWidth: 12, boxHeight: 2 } },
+        tooltip: { backgroundColor: "#111", borderColor: "#2a2a2a", borderWidth: 1, titleColor: "#e8e8e8", bodyColor: "#e8e8e8" },
+      },
+      scales: {
+        x: { ticks: { maxTicksLimit: 8, color: muted }, grid: { color: grid } },
+        y: { position: "right", ticks: { color: muted }, grid: { color: grid } },
+      },
+    },
+  };
+
+  if (chart) chart.destroy();
+  chart = new Chart(document.getElementById("chart"), cfg);
+}
+
+init();
+</script>
+</body>
+</html>
