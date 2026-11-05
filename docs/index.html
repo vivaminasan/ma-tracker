@@ -35,20 +35,24 @@
   /* Ticker strip (also the symbol selector) */
   .strip { display: flex; gap: 0; overflow-x: auto; border: 1px solid var(--pico-muted-border-color); margin-bottom: 1rem; }
   .strip button {
-    all: unset; cursor: pointer; flex: 0 0 auto; min-width: 9.5rem;
-    padding: .6rem 1rem; border-right: 1px solid var(--pico-muted-border-color);
-    border-bottom: 2px solid transparent; font-family: var(--mono); font-size: .85rem;
+    all: unset; cursor: pointer; flex: 0 0 auto;
+    padding: .7rem 1.1rem; border-right: 1px solid var(--pico-muted-border-color);
+    border-bottom: 2px solid transparent; font-family: var(--mono); font-size: 1.45rem;
   }
   .strip button:hover { background: #111; }
   .strip button.active { background: #111; border-bottom-color: var(--amber); }
-  .strip .sym { display: block; color: var(--amber); font-weight: 600; letter-spacing: .06em; }
-  .strip .px { font-variant-numeric: tabular-nums; }
-  .strip .pct { font-variant-numeric: tabular-nums; margin-left: .4rem; }
+  .strip .sym { display: block; color: var(--amber); font-weight: 600; letter-spacing: .06em; font-size: 1.5rem; }
+  .strip .px, .strip .pct { display: inline-block; font-size: 1.45rem; font-variant-numeric: tabular-nums; }
+  .strip .pct { margin-left: .6rem; }
 
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--pico-muted-border-color); border: 1px solid var(--pico-muted-border-color); margin-bottom: 1rem; }
+  .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--pico-muted-border-color); border: 1px solid var(--pico-muted-border-color); margin-bottom: 1rem; }
   .stats div { background: var(--pico-card-background-color); padding: .8rem 1rem; }
   .stats small { display: block; color: var(--pico-muted-color); text-transform: uppercase; letter-spacing: .08em; font-size: .68rem; }
   .stats b { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 1.45rem; font-weight: 600; }
+
+  .stats b.asof { font-size: 1.15rem; line-height: 2.1rem; }
+  @media (min-width: 600px)  { .stats { grid-template-columns: repeat(3, 1fr); } }
+  @media (min-width: 1000px) { .stats { grid-template-columns: repeat(6, 1fr); } }
 
   .above { color: var(--up); }
   .below { color: var(--down); }
@@ -59,7 +63,7 @@
 </style>
 </head>
 <body>
-<main class="container">
+<main class="container-fluid">
   <h1>200-Day Moving Average</h1>
   <div class="sub">End-of-day close vs. 200-day simple moving average</div>
 
@@ -121,10 +125,11 @@ function show(sym) {
   const sign = d.pctFromMA > 0 ? "+" : "";
   document.getElementById("cards").innerHTML = `
     <div><small>Status</small><b class="${cls}">${d.state.toUpperCase()}</b></div>
-    <div><small>Close (${d.date})</small><b>${d.close.toFixed(2)}</b></div>
+    <div><small>Close</small><b>${d.close.toFixed(2)}</b></div>
     <div><small>200 MA</small><b>${d.ma.toFixed(2)}</b></div>
     <div><small>Distance</small><b class="${cls}">${sign}${d.pctFromMA}%</b></div>
-    <div><small>Days in state</small><b>${d.daysInState}</b></div>`;
+    <div><small>Days in state</small><b>${d.daysInState}</b></div>
+    <div><small>As of</small><b class="asof">${d.date}</b></div>`;
 
   const css = getComputedStyle(document.documentElement);
   const get = (v) => css.getPropertyValue(v).trim();
